@@ -96,7 +96,7 @@ applicable agreement for further details.
 	(drawing
 		(text "2048 Word(s)" (rect 136 56 148 112)(font "Arial" )(vertical))
 		(text "RAM" (rect 149 74 161 94)(font "Arial" )(vertical))
-		(text "Block Type: AUTO" (rect 41 188 119 200)(font "Arial" ))
+		(text "Block Type: M4K" (rect 41 188 112 200)(font "Arial" ))
 		(line (pt 128 24)(pt 168 24)(line_width 1))
 		(line (pt 168 24)(pt 168 144)(line_width 1))
 		(line (pt 168 144)(pt 128 144)(line_width 1))

@@ -56,16 +56,16 @@ port (
 	TV_SYNC_IN 	: out std_logic;
 	
 	-- HDMI
---	HDMI_DATA	: out std_logic_vector (7 downto 0);
+	HDMI_DATA	: out std_logic_vector (7 downto 0);
 	HDMI_SCL	: in std_logic := '0';
 	HDMI_SDA	: in std_logic := '0';
 	HDMI_CEC	: in std_logic := '0';
 	HDMI_ARC	: in std_logic := '0';
 	HDMI_DET	: in std_logic := '0';
-	HDMI_D0		: out std_logic;
-	HDMI_D1		: out std_logic;
-	HDMI_D2		: out std_logic;
-	HDMI_CLK	: out std_logic;
+--	HDMI_D0		: out std_logic;
+--	HDMI_D1		: out std_logic;
+--	HDMI_D2		: out std_logic;
+--	HDMI_CLK	: out std_logic;
 
 	-- VGA 
 	VGA_nVGA_IN : in std_logic := '1';
@@ -96,6 +96,10 @@ signal VGA_B_REG	: std_logic_vector(7 downto 0) := "00000000";
 signal VGA_BLANK	: std_logic := '0';
 signal VGA_VS_O		: std_logic := '0';
 signal VGA_HS_O		: std_logic := '0';
+signal audio_l		: std_logic_vector(15 downto 0) := "0000000000000000";
+signal audio_r		: std_logic_vector(15 downto 0) := "0000000000000000";
+signal audio_l_reg	: std_logic_vector(15 downto 0) := "0000000000000000";
+signal audio_r_reg	: std_logic_vector(15 downto 0) := "0000000000000000";
 
 begin
 
@@ -127,21 +131,21 @@ port map (
 );
 
 -- HDMI
-inst_dvid: entity work.hdmi
-port map(
-	CLK_DVI		=> CLK_DVI,				-- clk 140mhz
-	CLK_PIXEL	=> CLK_PIXEL_VGA,		-- clk 28mhz
-	R			=> VGA_R_REG(0)&VGA_R_REG(1)&VGA_R_REG(2)&VGA_R_REG(3)&VGA_R_REG(4)&VGA_R_REG(5)&VGA_R_REG(6)&VGA_R_REG(7),
-	G			=> VGA_G_REG(0)&VGA_G_REG(1)&VGA_G_REG(2)&VGA_G_REG(3)&VGA_G_REG(4)&VGA_G_REG(5)&VGA_G_REG(6)&VGA_G_REG(7),
-	B			=> VGA_B_REG(0)&VGA_B_REG(1)&VGA_B_REG(2)&VGA_B_REG(3)&VGA_B_REG(4)&VGA_B_REG(5)&VGA_B_REG(6)&VGA_B_REG(7),
-	BLANK		=> not VGA_BLANK,
-	HSYNC		=> VGA_HS_O,
-	VSYNC		=> VGA_VS_O,
-	TMDS_D0		=> HDMI_D0,
-	TMDS_D1		=> HDMI_D1,
-	TMDS_D2		=> HDMI_D2,
-	TMDS_CLK	=> HDMI_CLK
-);
+--inst_dvid: entity work.hdmi
+--port map(
+--	CLK_DVI		=> CLK_DVI,				-- clk 140mhz
+--	CLK_PIXEL	=> CLK_PIXEL_VGA,		-- clk 28mhz
+--	R			=> VGA_R_REG(0)&VGA_R_REG(1)&VGA_R_REG(2)&VGA_R_REG(3)&VGA_R_REG(4)&VGA_R_REG(5)&VGA_R_REG(6)&VGA_R_REG(7),
+--	G			=> VGA_G_REG(0)&VGA_G_REG(1)&VGA_G_REG(2)&VGA_G_REG(3)&VGA_G_REG(4)&VGA_G_REG(5)&VGA_G_REG(6)&VGA_G_REG(7),
+--	B			=> VGA_B_REG(0)&VGA_B_REG(1)&VGA_B_REG(2)&VGA_B_REG(3)&VGA_B_REG(4)&VGA_B_REG(5)&VGA_B_REG(6)&VGA_B_REG(7),
+--	BLANK		=> not VGA_BLANK,
+--	HSYNC		=> VGA_HS_O,
+--	VSYNC		=> VGA_VS_O,
+--	TMDS_D0		=> HDMI_D0,
+--	TMDS_D1		=> HDMI_D1,
+--	TMDS_D2		=> HDMI_D2,
+--	TMDS_CLK	=> HDMI_CLK
+--);
 
 --hdmi_inst: entity work.hdmi
 --port map (
@@ -156,8 +160,28 @@ port map(
 --	I_BLUE		=> VGA_B_REG(0)&VGA_B_REG(1)&VGA_B_REG(2)&VGA_B_REG(3)&VGA_B_REG(4)&VGA_B_REG(5)&VGA_B_REG(6)&VGA_B_REG(7),
 --	O_TMDS		=> HDMI_DATA); D7=D2p, D6=D2n...D1=CLKp, D0=CLKn
 
+inst_dvid: entity work.hdmi
+generic map (
+	FREQ		=> 25200000,	-- pixel clock frequency = 25.2MHz
+	FS		=> 48000,	-- audio sample rate - should be 32000, 41000 or 48000 = 48KHz
+	CTS		=> 25200,	-- CTS = Freq(pixclk) * N / (128 * Fs)
+	N		=> 6144)	-- N = 128 * Fs /1000,  128 * Fs /1500 <= N <= 128 * Fs /300 (Check HDMI spec 7.2 for details)
+port map (
+	I_CLK_VGA	=> CLK_PIXEL_VGA,
+	I_CLK_TMDS	=> CLK_DVI,	-- 472.6 MHz max
+	I_HSYNC		=> VGA_HS_O,
+	I_VSYNC		=> VGA_VS_O,
+	I_BLANK		=> not VGA_BLANK,
+	I_RED		=> VGA_R_REG(0)&VGA_R_REG(1)&VGA_R_REG(2)&VGA_R_REG(3)&VGA_R_REG(4)&VGA_R_REG(5)&VGA_R_REG(6)&VGA_R_REG(7),
+	I_GREEN		=> VGA_G_REG(0)&VGA_G_REG(1)&VGA_G_REG(2)&VGA_G_REG(3)&VGA_G_REG(4)&VGA_G_REG(5)&VGA_G_REG(6)&VGA_G_REG(7),
+	I_BLUE		=> VGA_B_REG(0)&VGA_B_REG(1)&VGA_B_REG(2)&VGA_B_REG(3)&VGA_B_REG(4)&VGA_B_REG(5)&VGA_B_REG(6)&VGA_B_REG(7),
+	I_AUDIO_PCM_L 	=> audio_l,
+	I_AUDIO_PCM_R	=> audio_r,
+	O_TMDS		=> HDMI_DATA);	-- D7=D2p, D6=D2n...D1=CLKp, D0=CLKn
+
 -------------------------------------------------------------------------------
 -- clocks
+-- video
 
 CLK_VGA <= CLK_PLL_IN and CLK_PIXEL_VGA;
 
@@ -205,6 +229,33 @@ begin
 		VGA_G <= TV_G_REG;
 		VGA_B <= TV_B_REG;
 		CLK_7125 <= not (TV_VS_REG or TV_HS_REG) and CLK_PIXEL_TV;
+	end if;
+end process;
+
+-- audio
+
+process (DAC_BCK, DAC_DATA, DAC_WS, audio_l_reg, audio_r_reg)
+begin 
+	if (DAC_BCK'event and DAC_BCK = '1') then 
+		if DAC_WS = '0' then
+			audio_l_reg <= audio_l_reg(14 downto 0)&DAC_DATA;
+		else
+			audio_r_reg <= audio_r_reg(14 downto 0)&DAC_DATA;
+		end if;
+	end if;
+end process;
+
+process (DAC_WS, audio_l, audio_l_reg)
+begin 
+	if (DAC_WS'event and DAC_WS = '1') then 
+		audio_l <= audio_l_reg;
+	end if;
+end process;
+
+process (DAC_WS, audio_l, audio_l_reg)
+begin 
+	if (DAC_WS'event and DAC_WS = '0') then 
+		audio_r <= audio_r_reg;
 	end if;
 end process;
 
