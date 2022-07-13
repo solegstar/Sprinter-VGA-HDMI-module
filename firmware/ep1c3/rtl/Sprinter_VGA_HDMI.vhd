@@ -98,8 +98,26 @@ signal VGA_VS_O		: std_logic := '0';
 signal VGA_HS_O		: std_logic := '0';
 signal audio_l		: std_logic_vector(15 downto 0) := "0000000000000000";
 signal audio_r		: std_logic_vector(15 downto 0) := "0000000000000000";
-signal audio_l_reg	: std_logic_vector(15 downto 0) := "0000000000000000";
-signal audio_r_reg	: std_logic_vector(15 downto 0) := "0000000000000000";
+signal is_error		: std_logic;
+signal o_valid		: std_logic;
+signal o_is_left	: std_logic;
+signal o_audio		: std_logic_vector(31 downto 0) := "00000000000000000000000000000000";
+
+component serial_audio_decoder
+port (
+	sclk	: in std_logic := '0';
+	reset	: in std_logic := '0';
+	lrclk	: in std_logic := '0';
+	sdin	: in std_logic := '0';
+	is_i2s	: in std_logic := '1';
+	lrclk_polarity	: in std_logic := '0';
+	is_error	: out std_logic;
+	o_valid		: out std_logic;
+	o_ready		: in std_logic := '1';
+	o_is_left	: out std_logic;
+    o_audio		: out std_logic_vector (31 downto 0)
+);
+end component;
 
 begin
 
@@ -179,6 +197,21 @@ port map (
 	I_AUDIO_PCM_R	=> audio_r,
 	O_TMDS		=> HDMI_DATA);	-- D7=D2p, D6=D2n...D1=CLKp, D0=CLKn
 
+audio_decoder: serial_audio_decoder
+port map (
+	sclk	=> DAC_BCK,
+	reset	=> not locked,
+	lrclk	=> DAC_WS,
+	sdin	=> DAC_DATA,
+	is_i2s	=> '1',
+	lrclk_polarity	=> '0',
+	is_error	=> is_error,
+	o_valid		=> o_valid,
+	o_ready		=> '1',
+	o_is_left	=> o_is_left,
+    o_audio		=> o_audio
+);
+
 -------------------------------------------------------------------------------
 -- clocks
 -- video
@@ -234,29 +267,7 @@ end process;
 
 -- audio
 
-process (DAC_BCK, DAC_DATA, DAC_WS, audio_l_reg, audio_r_reg)
-begin 
-	if (DAC_BCK'event and DAC_BCK = '1') then 
-		if DAC_WS = '0' then
-			audio_l_reg <= audio_l_reg(14 downto 0)&DAC_DATA;
-		else
-			audio_r_reg <= audio_r_reg(14 downto 0)&DAC_DATA;
-		end if;
-	end if;
-end process;
-
-process (DAC_WS, audio_l, audio_l_reg)
-begin 
-	if (DAC_WS'event and DAC_WS = '1') then 
-		audio_l <= audio_l_reg;
-	end if;
-end process;
-
-process (DAC_WS, audio_l, audio_l_reg)
-begin 
-	if (DAC_WS'event and DAC_WS = '0') then 
-		audio_r <= audio_r_reg;
-	end if;
-end process;
+audio_l (15 downto 0) <= o_audio (31 downto 16);
+audio_r (15 downto 0) <= o_audio (15 downto 0);
 
 end rtl;
