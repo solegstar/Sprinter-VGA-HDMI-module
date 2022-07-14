@@ -81,6 +81,7 @@ ARCHITECTURE SYN OF linebuf IS
 		outdata_reg_a		: STRING;
 		outdata_reg_b		: STRING;
 		power_up_uninitialized		: STRING;
+		ram_block_type		: STRING;
 		widthad_a		: NATURAL;
 		widthad_b		: NATURAL;
 		width_a		: NATURAL;
@@ -127,6 +128,7 @@ BEGIN
 		outdata_reg_a => "CLOCK0",
 		outdata_reg_b => "CLOCK1",
 		power_up_uninitialized => "FALSE",
+		ram_block_type => "M4K",
 		widthad_a => 11,
 		widthad_b => 11,
 		width_a => 24,
@@ -194,7 +196,7 @@ END SYN;
 -- Retrieval info: PRIVATE: OPERATION_MODE NUMERIC "3"
 -- Retrieval info: PRIVATE: OUTDATA_ACLR_B NUMERIC "0"
 -- Retrieval info: PRIVATE: OUTDATA_REG_B NUMERIC "1"
--- Retrieval info: PRIVATE: RAM_BLOCK_TYPE NUMERIC "0"
+-- Retrieval info: PRIVATE: RAM_BLOCK_TYPE NUMERIC "2"
 -- Retrieval info: PRIVATE: READ_DURING_WRITE_MODE_MIXED_PORTS NUMERIC "2"
 -- Retrieval info: PRIVATE: READ_DURING_WRITE_MODE_PORT_A NUMERIC "3"
 -- Retrieval info: PRIVATE: READ_DURING_WRITE_MODE_PORT_B NUMERIC "3"
@@ -233,6 +235,7 @@ END SYN;
 -- Retrieval info: CONSTANT: OUTDATA_REG_A STRING "CLOCK0"
 -- Retrieval info: CONSTANT: OUTDATA_REG_B STRING "CLOCK1"
 -- Retrieval info: CONSTANT: POWER_UP_UNINITIALIZED STRING "FALSE"
+-- Retrieval info: CONSTANT: RAM_BLOCK_TYPE STRING "M4K"
 -- Retrieval info: CONSTANT: WIDTHAD_A NUMERIC "11"
 -- Retrieval info: CONSTANT: WIDTHAD_B NUMERIC "11"
 -- Retrieval info: CONSTANT: WIDTH_A NUMERIC "24"

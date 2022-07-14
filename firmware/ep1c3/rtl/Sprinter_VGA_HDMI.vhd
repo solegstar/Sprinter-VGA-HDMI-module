@@ -56,16 +56,16 @@ port (
 	TV_SYNC_IN 	: out std_logic;
 	
 	-- HDMI
---	HDMI_DATA	: out std_logic_vector (7 downto 0);
+	HDMI_DATA	: out std_logic_vector (7 downto 0);
 	HDMI_SCL	: in std_logic := '0';
 	HDMI_SDA	: in std_logic := '0';
 	HDMI_CEC	: in std_logic := '0';
 	HDMI_ARC	: in std_logic := '0';
 	HDMI_DET	: in std_logic := '0';
-	HDMI_D0		: out std_logic;
-	HDMI_D1		: out std_logic;
-	HDMI_D2		: out std_logic;
-	HDMI_CLK	: out std_logic;
+--	HDMI_D0		: out std_logic;
+--	HDMI_D1		: out std_logic;
+--	HDMI_D2		: out std_logic;
+--	HDMI_CLK	: out std_logic;
 
 	-- VGA 
 	VGA_nVGA_IN : in std_logic := '1';
@@ -79,6 +79,40 @@ port (
 end Sprinter_VGA_HDMI;
 
 architecture rtl of Sprinter_VGA_HDMI is
+
+-- ModeLine " 640x 480@60Hz"  25.20  640  656  752  800  480  490  492  525 -HSync -VSync
+-- ModeLine " 720x 480@60Hz"  27.00  720  736  798  858  480  489  495  525 -HSync -VSync
+-- Modeline " 800x 600@60Hz"  40.00  800  840  968 1056  600  601  605  628 +HSync +VSync
+-- ModeLine "1024x 768@60Hz"  65.00 1024 1048 1184 1344  768  771  777  806 -HSync -VSync
+-- ModeLine "1280x 720@60Hz"  74.25 1280 1390 1430 1650  720  725  730  750 +HSync +VSync
+-- ModeLine "1280x 768@60Hz"  80.14 1280 1344 1480 1680  768  769  772  795 +HSync +VSync
+-- ModeLine "1280x 800@60Hz"  83.46 1280 1344 1480 1680  800  801  804  828 +HSync +VSync
+-- ModeLine "1280x 960@60Hz" 108.00 1280 1376 1488 1800  960  961  964 1000 +HSync +VSync
+-- ModeLine "1280x1024@60Hz" 108.00 1280 1328 1440 1688 1024 1025 1028 1066 +HSync +VSync
+-- ModeLine "1360x 768@60Hz"  85.50 1360 1424 1536 1792  768  771  778  795 -HSync -VSync
+-- ModeLine "1920x1080@25Hz"  74.25 1920 2448 2492 2640 1080 1084 1089 1125 +HSync +VSync
+-- ModeLine "1920x1080@30Hz"  89.01 1920 2448 2492 2640 1080 1084 1089 1125 +HSync +VSync
+
+-- Horizontal Timing constants  
+constant h_pixels_across	: integer := 720 - 1;
+constant h_sync_on			: integer := 744 - 1;
+constant h_sync_off			: integer := 824 - 1;
+constant h_end_count			: integer := 896 - 1;
+-- Vertical Timing constants
+constant v_pixels_down		: integer := 576 - 1;
+constant v_sync_on			: integer := 583 - 1;
+constant v_sync_off			: integer := 589 - 1;
+constant v_end_count			: integer := 637 - 1;
+
+signal hcnt			: std_logic_vector(11 downto 0) := "000000000000"; 	-- horizontal pixel counter
+signal vcnt			: std_logic_vector(11 downto 0) := "000000000000"; 	-- vertical line counter
+signal hsync		: std_logic;
+signal vsync		: std_logic;
+signal blank		: std_logic;
+signal shift		: std_logic_vector(7 downto 0);
+signal red			: std_logic_vector(7 downto 0);
+signal green		: std_logic_vector(7 downto 0);
+signal blue			: std_logic_vector(7 downto 0);
 
 signal CLK_PIXEL_TV	: std_logic := '0';
 signal CLK_VGA		: std_logic := '0';
@@ -96,6 +130,28 @@ signal VGA_B_REG	: std_logic_vector(7 downto 0) := "00000000";
 signal VGA_BLANK	: std_logic := '0';
 signal VGA_VS_O		: std_logic := '0';
 signal VGA_HS_O		: std_logic := '0';
+signal audio_l		: std_logic_vector(15 downto 0) := "0000000000000000";
+signal audio_r		: std_logic_vector(15 downto 0) := "0000000000000000";
+signal is_error		: std_logic;
+signal o_valid		: std_logic;
+signal o_is_left	: std_logic;
+signal o_audio		: std_logic_vector(31 downto 0) := "00000000000000000000000000000000";
+
+component serial_audio_decoder
+port (
+	sclk	: in std_logic := '0';
+	reset	: in std_logic := '0';
+	lrclk	: in std_logic := '0';
+	sdin	: in std_logic := '0';
+	is_i2s	: in std_logic := '1';
+	lrclk_polarity	: in std_logic := '0';
+	is_error	: out std_logic;
+	o_valid		: out std_logic;
+	o_ready		: in std_logic := '1';
+	o_is_left	: out std_logic;
+    o_audio		: out std_logic_vector (31 downto 0)
+);
+end component;
 
 begin
 
@@ -127,21 +183,21 @@ port map (
 );
 
 -- HDMI
-inst_dvid: entity work.hdmi
-port map(
-	CLK_DVI		=> CLK_DVI,				-- clk 140mhz
-	CLK_PIXEL	=> CLK_PIXEL_VGA,		-- clk 28mhz
-	R			=> VGA_R_REG(0)&VGA_R_REG(1)&VGA_R_REG(2)&VGA_R_REG(3)&VGA_R_REG(4)&VGA_R_REG(5)&VGA_R_REG(6)&VGA_R_REG(7),
-	G			=> VGA_G_REG(0)&VGA_G_REG(1)&VGA_G_REG(2)&VGA_G_REG(3)&VGA_G_REG(4)&VGA_G_REG(5)&VGA_G_REG(6)&VGA_G_REG(7),
-	B			=> VGA_B_REG(0)&VGA_B_REG(1)&VGA_B_REG(2)&VGA_B_REG(3)&VGA_B_REG(4)&VGA_B_REG(5)&VGA_B_REG(6)&VGA_B_REG(7),
-	BLANK		=> not VGA_BLANK,
-	HSYNC		=> VGA_HS_O,
-	VSYNC		=> VGA_VS_O,
-	TMDS_D0		=> HDMI_D0,
-	TMDS_D1		=> HDMI_D1,
-	TMDS_D2		=> HDMI_D2,
-	TMDS_CLK	=> HDMI_CLK
-);
+--inst_dvid: entity work.hdmi
+--port map(
+--	CLK_DVI		=> CLK_DVI,				-- clk 140mhz
+--	CLK_PIXEL	=> CLK_PIXEL_VGA,		-- clk 28mhz
+--	R			=> VGA_R_REG(0)&VGA_R_REG(1)&VGA_R_REG(2)&VGA_R_REG(3)&VGA_R_REG(4)&VGA_R_REG(5)&VGA_R_REG(6)&VGA_R_REG(7),
+--	G			=> VGA_G_REG(0)&VGA_G_REG(1)&VGA_G_REG(2)&VGA_G_REG(3)&VGA_G_REG(4)&VGA_G_REG(5)&VGA_G_REG(6)&VGA_G_REG(7),
+--	B			=> VGA_B_REG(0)&VGA_B_REG(1)&VGA_B_REG(2)&VGA_B_REG(3)&VGA_B_REG(4)&VGA_B_REG(5)&VGA_B_REG(6)&VGA_B_REG(7),
+--	BLANK		=> not VGA_BLANK,
+--	HSYNC		=> VGA_HS_O,
+--	VSYNC		=> VGA_VS_O,
+--	TMDS_D0		=> HDMI_D0,
+--	TMDS_D1		=> HDMI_D1,
+--	TMDS_D2		=> HDMI_D2,
+--	TMDS_CLK	=> HDMI_CLK
+--);
 
 --hdmi_inst: entity work.hdmi
 --port map (
@@ -156,8 +212,92 @@ port map(
 --	I_BLUE		=> VGA_B_REG(0)&VGA_B_REG(1)&VGA_B_REG(2)&VGA_B_REG(3)&VGA_B_REG(4)&VGA_B_REG(5)&VGA_B_REG(6)&VGA_B_REG(7),
 --	O_TMDS		=> HDMI_DATA); D7=D2p, D6=D2n...D1=CLKp, D0=CLKn
 
+--inst_dvid: entity work.hdmi
+--generic map (
+--	FREQ		=> 25200000,	-- pixel clock frequency = 25.2MHz
+--	FS		=> 48000,	-- audio sample rate - should be 32000, 41000 or 48000 = 48KHz
+--	CTS		=> 25200,	-- CTS = Freq(pixclk) * N / (128 * Fs)
+--	N		=> 6144)	-- N = 128 * Fs /1000,  128 * Fs /1500 <= N <= 128 * Fs /300 (Check HDMI spec 7.2 for details)
+--port map (
+--	I_CLK_VGA	=> CLK_PIXEL_VGA,
+--	I_CLK_TMDS	=> CLK_DVI,	-- 472.6 MHz max
+--	I_HSYNC		=> VGA_HS_O,
+--	I_VSYNC		=> VGA_VS_O,
+--	I_BLANK		=> not VGA_BLANK,
+--	I_RED		=> VGA_R_REG(0)&VGA_R_REG(1)&VGA_R_REG(2)&VGA_R_REG(3)&VGA_R_REG(4)&VGA_R_REG(5)&VGA_R_REG(6)&VGA_R_REG(7),
+--	I_GREEN		=> VGA_G_REG(0)&VGA_G_REG(1)&VGA_G_REG(2)&VGA_G_REG(3)&VGA_G_REG(4)&VGA_G_REG(5)&VGA_G_REG(6)&VGA_G_REG(7),
+--	I_BLUE		=> VGA_B_REG(0)&VGA_B_REG(1)&VGA_B_REG(2)&VGA_B_REG(3)&VGA_B_REG(4)&VGA_B_REG(5)&VGA_B_REG(6)&VGA_B_REG(7),
+--	I_AUDIO_PCM_L 	=> audio_l,
+--	I_AUDIO_PCM_R	=> audio_r,
+--	O_TMDS		=> HDMI_DATA);	-- D7=D2p, D6=D2n...D1=CLKp, D0=CLKn
+
+inst_dvid: entity work.hdmi
+generic map (
+	FREQ		=> 28000000,	-- pixel clock frequency = 25.2MHz
+	FS		=> 48000,	-- audio sample rate - should be 32000, 41000 or 48000 = 48KHz
+	CTS		=> 28000,	-- CTS = Freq(pixclk) * N / (128 * Fs)
+	N		=> 6144)	-- N = 128 * Fs /1000,  128 * Fs /1500 <= N <= 128 * Fs /300 (Check HDMI spec 7.2 for details)
+port map (
+	I_CLK_VGA	=> CLK_PIXEL_VGA,
+	I_CLK_TMDS	=> CLK_DVI,	-- 472.6 MHz max
+	I_HSYNC		=> hsync,
+	I_VSYNC		=> vsync,
+	I_BLANK		=> blank,
+	I_RED		=> red,
+	I_GREEN		=> green,
+	I_BLUE		=> blue,
+	I_AUDIO_PCM_L 	=> audio_l,
+	I_AUDIO_PCM_R	=> audio_r,
+	O_TMDS		=> HDMI_DATA);	-- D7=D2p, D6=D2n...D1=CLKp, D0=CLKn
+
+audio_decoder: serial_audio_decoder
+port map (
+	sclk	=> DAC_BCK,
+	reset	=> not locked,
+	lrclk	=> DAC_WS,
+	sdin	=> DAC_DATA,
+	is_i2s	=> '1',
+	lrclk_polarity	=> '0',
+	is_error	=> is_error,
+	o_valid		=> o_valid,
+	o_ready		=> '1',
+	o_is_left	=> o_is_left,
+    o_audio		=> o_audio
+);
+
 -------------------------------------------------------------------------------
 -- clocks
+-- test
+
+	process (CLK_PIXEL_VGA, hcnt)
+	begin
+		if CLK_PIXEL_VGA'event and CLK_PIXEL_VGA = '1' then
+			if hcnt = h_end_count then
+				hcnt <= (others => '0');
+			else
+				hcnt <= hcnt + 1;
+			end if;
+			if hcnt = h_sync_on then
+				if vcnt = v_end_count then
+					vcnt <= (others => '0');
+					shift <= shift + 1;
+				else
+					vcnt <= vcnt + 1;
+				end if;
+			end if;
+		end if;
+	end process;
+
+	hsync	<= '1' when (hcnt <= h_sync_on) or (hcnt > h_sync_off) else '0';
+	vsync	<= '1' when (vcnt <= v_sync_on) or (vcnt > v_sync_off) else '0';
+	blank	<= '1' when (hcnt > h_pixels_across) or (vcnt > v_pixels_down) else '0';
+
+	red	<= "11111111" when hcnt = 0 or hcnt = h_pixels_across or vcnt = 0 or vcnt = v_pixels_down else (hcnt(7 downto 0) + shift) and "11111111";
+	green	<= "11111111" when hcnt = 0 or hcnt = h_pixels_across or vcnt = 0 or vcnt = v_pixels_down else (vcnt(7 downto 0) + shift) and "11111111";
+	blue	<= "11111111" when hcnt = 0 or hcnt = h_pixels_across or vcnt = 0 or vcnt = v_pixels_down else (hcnt(7 downto 0) + vcnt(7 downto 0) - shift) and "11111111";
+
+
+-- video
 
 CLK_VGA <= CLK_PLL_IN and CLK_PIXEL_VGA;
 
@@ -207,5 +347,10 @@ begin
 		CLK_7125 <= not (TV_VS_REG or TV_HS_REG) and CLK_PIXEL_TV;
 	end if;
 end process;
+
+-- audio
+
+audio_l (15 downto 0) <= o_audio (31 downto 16);
+audio_r (15 downto 0) <= o_audio (15 downto 0);
 
 end rtl;
