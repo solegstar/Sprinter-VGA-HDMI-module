@@ -1,6 +1,6 @@
 `default_nettype none
 
-module serial_audio_decoder #(parameter audio_width = 32)(
+module serial_audio_decoder #(parameter audio_width = 16)(
     input wire sclk,
     input wire reset,
     input wire lrclk,

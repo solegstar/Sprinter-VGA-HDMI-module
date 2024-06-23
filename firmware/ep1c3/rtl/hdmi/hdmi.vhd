@@ -38,6 +38,10 @@ port (
 	I_BLUE		: in std_logic_vector(7 downto 0);	
 	I_AUDIO_PCM_L 	: in std_logic_vector(15 downto 0);
 	I_AUDIO_PCM_R	: in std_logic_vector(15 downto 0);
+	TMDS_D0		: out std_logic;
+	TMDS_D1		: out std_logic;
+	TMDS_D2		: out std_logic;
+	TMDS_CLK	: out std_logic;
 	O_TMDS		: out std_logic_vector(7 downto 0));
 end entity;
 
@@ -342,28 +346,44 @@ port map (
 
 -- HDMI data serialiser
 -- Outputs the encoded video data as serial data across the HDMI bus
-ddio_inst: entity work.altddio_out1
-port map (
-	datain_h	=> shift_r(0) & not(shift_r(0)) & shift_g(0) & not(shift_g(0)) & shift_b(0) & not(shift_b(0)) & I_CLK_VGA & not(I_CLK_VGA),
-	datain_l	=> shift_r(1) & not(shift_r(1)) & shift_g(1) & not(shift_g(1)) & shift_b(1) & not(shift_b(1)) & I_CLK_VGA & not(I_CLK_VGA),
-	outclock	=> I_CLK_TMDS,
-	dataout		=> O_TMDS);
+--ddio_inst: entity work.altddio_out1
+--port map (
+--	datain_h	=> shift_r(0) & not(shift_r(0)) & shift_g(0) & not(shift_g(0)) & shift_b(0) & not(shift_b(0)) & I_CLK_VGA & not(I_CLK_VGA),
+--	datain_l	=> shift_r(1) & not(shift_r(1)) & shift_g(1) & not(shift_g(1)) & shift_b(1) & not(shift_b(1)) & I_CLK_VGA & not(I_CLK_VGA),
+--	outclock	=> I_CLK_TMDS,
+--	dataout		=> O_TMDS);
+--
+--process (I_CLK_TMDS)
+--begin
+--	if I_CLK_TMDS'event and I_CLK_TMDS = '1' then
+--		if mod5(2) = '1' then
+--			mod5 <= "000";
+--			shift_r <= red;
+--			shift_g <= green;
+--			shift_b <= blue;
+--		else
+--			mod5 <= mod5 + "001";
+--			shift_r <= "00" & shift_r(9 downto 2);
+--			shift_g <= "00" & shift_g(9 downto 2);
+--			shift_b <= "00" & shift_b(9 downto 2);
+--		end if;
+--	end if;
+--end process;
 
-process (I_CLK_TMDS)
-begin
-	if I_CLK_TMDS'event and I_CLK_TMDS = '1' then
-		if mod5(2) = '1' then
-			mod5 <= "000";
-			shift_r <= red;
-			shift_g <= green;
-			shift_b <= blue;
-		else
-			mod5 <= mod5 + "001";
-			shift_r <= "00" & shift_r(9 downto 2);
-			shift_g <= "00" & shift_g(9 downto 2);
-			shift_b <= "00" & shift_b(9 downto 2);
-		end if;
-	end if;
-end process;
+serializer_inst: entity work.serializer
+PORT MAP (
+	tx_in	 		=> tx_in,
+	tx_inclock	 	=> I_CLK_TMDS,
+	tx_syncclock	=> I_CLK_VGA,
+	tx_out	 		=> tmds_d);
+	
+tx_in <= red(0) & red(1) & red(2) & red(3) & red(4) & red(5) & red(6) & red(7) & red(8) & red(9) &
+		 green(0) & green(1) & green(2) & green(3) & green(4) & green(5) & green(6) & green(7) & green(8) & green(9) &
+		 blue(0) & blue(1) & blue(2) & blue(3) & blue(4) & blue(5) & blue(6) & blue(7) & blue(8) & blue(9);
+
+TMDS_D0	 <= tmds_d(0);
+TMDS_D1	 <= tmds_d(1);
+TMDS_D2	 <= tmds_d(2);
+TMDS_CLK <= I_CLK_VGA;
 
 end rtl;
