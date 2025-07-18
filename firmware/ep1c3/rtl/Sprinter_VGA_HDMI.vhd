@@ -39,9 +39,6 @@ port (
 	CLK_PLL_IN 	: in std_logic := '0';
 	CLK_PLL_OUT : out std_logic := '0';
 	CLK_7125	: out std_logic := '0';
-	DAC_BCK		: in std_logic := '0';
-	DAC_DATA	: in std_logic := '0';
-	DAC_WS		: in std_logic := '0';
 
 	-- TV IN
 	TV_R 		: in std_logic_vector(7 downto 0) := "00000000";
@@ -54,6 +51,12 @@ port (
 	TV_nBLANK 	: out std_logic;
 	TV_nSYNC_IN : in std_logic := '0';
 	TV_SYNC_IN 	: out std_logic;
+	
+	-- ADC
+	ADC_CLK		: out std_logic := '1';
+	ADC_LRCK	: out std_logic := '1';
+	ADC_BCK		: out std_logic := '1';
+	ADC_DOUT	: in std_logic := '1';
 	
 	-- HDMI
 --	HDMI_DATA	: out std_logic_vector (7 downto 0);
@@ -98,29 +101,9 @@ signal VGA_VS_O		: std_logic := '0';
 signal VGA_HS_O		: std_logic := '0';
 signal audio_l		: std_logic_vector(15 downto 0) := "0000000000000000";
 signal audio_r		: std_logic_vector(15 downto 0) := "0000000000000000";
-signal is_error		: std_logic;
-signal o_valid		: std_logic;
-signal o_is_left	: std_logic;
-signal o_audio		: std_logic_vector(15 downto 0) := "0000000000000000";
-signal audio_reg	: std_logic_vector(31 downto 0) := "00000000000000000000000000000000";
-signal flag_left	: std_logic := '0';
-signal flag_right	: std_logic := '0';
+signal adc_l		: std_logic_vector(23 downto 0) := x"000000";
+signal adc_r		: std_logic_vector(23 downto 0) := x"000000";
 
-component serial_audio_decoder
-port (
-	sclk	: in std_logic := '0';
-	reset	: in std_logic := '0';
-	lrclk	: in std_logic := '0';
-	sdin	: in std_logic := '0';
-	is_i2s	: in std_logic := '1';
-	lrclk_polarity	: in std_logic := '0';
-	is_error	: out std_logic;
-	o_valid		: out std_logic;
-	o_ready		: in std_logic := '1';
-	o_is_left	: out std_logic;
-    o_audio		: out std_logic_vector (15 downto 0)
-);
-end component;
 
 begin
 
@@ -151,8 +134,22 @@ port map (
 	HSYNC_VGA			=> VGA_HS_O
 );
 
+U3: entity work.i2s_transceiver
+port map (
+	reset_n		=> locked,
+	mclk		=> CLK_VGA,
+	sclk		=> ADC_BCK,
+	ws			=> ADC_LRCK,
+	sd_tx		=> open,
+	sd_rx		=> ADC_DOUT,
+	l_data_tx	=> x"000000",
+	r_data_tx	=> x"000000",
+	l_data_rx	=> adc_l,
+	r_data_rx	=> adc_r
+	);
+
 -- HDMI
-inst_dvid: entity work.hdmi
+U4: entity work.hdmi
 generic map (
 	FREQ	=> 28000000,	-- pixel clock frequency = 25.2MHz
 	FS		=> 48000,	-- audio sample rate - should be 32000, 41000 or 48000 = 48KHz
@@ -184,22 +181,6 @@ port map (
 	TMDS_D1		=> HDMI_D1,
 	TMDS_D2		=> HDMI_D2,
 	TMDS_CLK	=> HDMI_CLK);	-- D7=D2p, D6=D2n...D1=CLKp, D0=CLKn
-
--- Audio Decoder
-audio_decoder: serial_audio_decoder
-port map (
-	sclk	=> DAC_BCK,
-	reset	=> not locked,
-	lrclk	=> DAC_WS,
-	sdin	=> DAC_DATA,
-	is_i2s	=> '1',
-	lrclk_polarity	=> '0',
-	is_error	=> is_error,
-	o_valid		=> o_valid,
-	o_ready		=> '1',
-	o_is_left	=> o_is_left,
-    o_audio		=> o_audio
-);
 
 -------------------------------------------------------------------------------
 -- clocks
@@ -255,24 +236,13 @@ begin
 end process;
 
 -- audio
-process (DAC_BCK, audio_reg, o_valid, o_audio, is_error, o_is_left)
-begin
-	if DAC_BCK'event and DAC_BCK = '1' then
-		if o_valid = '1' and is_error = '0' and VGA_BLANK = '0' then
-			if o_is_left = '1' then
-				audio_reg (31 downto 16) <= o_audio (15 downto 0);
-			else
-				audio_reg (15 downto 0) <= o_audio (15 downto 0);
-			end if;
-		end if;
-	end if;
-end process;
+ADC_CLK <= CLK_VGA;
 
-process (CLK_VGA, VGA_BLANK, audio_reg, audio_l, audio_r)
+process (CLK_VGA, VGA_BLANK, audio_l, audio_r)
 begin
 	if CLK_VGA'event and CLK_VGA = '1' then
-		audio_l (15 downto 0) <= audio_reg (31 downto 16);
-		audio_r (15 downto 0) <= audio_reg (15 downto 0);
+		audio_l (15 downto 0) <= adc_l (23 downto 8);
+		audio_r (15 downto 0) <= adc_r (23 downto 8);
 	end if;
 end process;
 
