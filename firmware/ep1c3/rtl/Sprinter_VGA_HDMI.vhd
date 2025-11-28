@@ -22,7 +22,7 @@
 -- @author Andy Karpov <andy.karpov@gmail.com>																												   --
 -- @HDMI codec by MVV <https://github.com/mvvproject/ReVerSE-U16>																							   --
 -- @author Oleh Starychenko <solegstar@gmail.com>																											   --
--- Ukraine, 2022																																			   --
+-- Ukraine, 2025																																			   --
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 library IEEE; 
@@ -59,16 +59,17 @@ port (
 	ADC_DOUT	: in std_logic := '1';
 	
 	-- HDMI
---	HDMI_DATA	: out std_logic_vector (7 downto 0);
 	HDMI_SCL	: in std_logic := '0';
 	HDMI_SDA	: in std_logic := '0';
 	HDMI_CEC	: in std_logic := '0';
 	HDMI_ARC	: in std_logic := '0';
 	HDMI_DET	: in std_logic := '0';
-	HDMI_D0		: out std_logic;
-	HDMI_D1		: out std_logic;
-	HDMI_D2		: out std_logic;
-	HDMI_CLK	: out std_logic;
+--	HDMI_D0		: out std_logic;
+--	HDMI_D1		: out std_logic;
+--	HDMI_D2		: out std_logic;
+--	HDMI_CLK		: std_logic;
+	tmds_out_p	: out std_logic_vector (3 downto 0);
+	tmds_out_n	: out std_logic_vector (3 downto 0);
 
 	-- VGA 
 	VGA_nVGA_IN : in std_logic := '1';
@@ -103,7 +104,9 @@ signal audio_l		: std_logic_vector(15 downto 0) := "0000000000000000";
 signal audio_r		: std_logic_vector(15 downto 0) := "0000000000000000";
 signal adc_l		: std_logic_vector(23 downto 0) := x"000000";
 signal adc_r		: std_logic_vector(23 downto 0) := x"000000";
-
+signal O_RED		: std_logic_vector(9 downto 0); -- Red
+signal O_GREEN		: std_logic_vector(9 downto 0); -- Green
+signal O_BLUE		: std_logic_vector(9 downto 0);  -- Blue
 
 begin
 
@@ -150,37 +153,37 @@ port map (
 
 -- HDMI
 U4: entity work.hdmi
-generic map (
-	FREQ	=> 28000000,	-- pixel clock frequency = 25.2MHz
-	FS		=> 48000,	-- audio sample rate - should be 32000, 41000 or 48000 = 48KHz
-	CTS		=> 28000,	-- CTS = Freq(pixclk) * N / (128 * Fs)
-	N		=> 6144)	-- N = 128 * Fs /1000,  128 * Fs /1500 <= N <= 128 * Fs /300 (Check HDMI spec 7.2 for details)
+   port map(
+      -- clocks
+      I_CLK_PIXEL	=> CLK_PIXEL_VGA,
+      -- components
+      I_R			=> VGA_R_REG(0)&VGA_R_REG(1)&VGA_R_REG(2)&VGA_R_REG(3)&VGA_R_REG(4)&VGA_R_REG(5)&VGA_R_REG(6)&VGA_R_REG(7),
+      I_G			=> VGA_G_REG(0)&VGA_G_REG(1)&VGA_G_REG(2)&VGA_G_REG(3)&VGA_G_REG(4)&VGA_G_REG(5)&VGA_G_REG(6)&VGA_G_REG(7),
+      I_B			=> VGA_B_REG(0)&VGA_B_REG(1)&VGA_B_REG(2)&VGA_B_REG(3)&VGA_B_REG(4)&VGA_B_REG(5)&VGA_B_REG(6)&VGA_B_REG(7),
+      I_BLANK		=> not VGA_BLANK,
+      I_HSYNC		=> VGA_HS_O,
+      I_VSYNC		=> VGA_VS_O,
+      I_576P_N		=> '0',
+      -- PCM audio
+      I_AUDIO_ENABLE	=> '1',
+      I_AUDIO_PCM_L	=> audio_l,
+      I_AUDIO_PCM_R	=> audio_r,
+      -- TMDS parallel pixel synchronous outputs (serialize LSB first)
+      O_RED				=> O_RED,
+      O_GREEN			=> O_GREEN,
+      O_BLUE			=> O_BLUE
+);
 
---	FREQ	=> 28000000,	-- pixel clock frequency = 25.2MHz
---	FS		=> 41000,	-- audio sample rate - should be 32000, 41000 or 48000 = 48KHz
---	CTS		=> 28000,	-- CTS = Freq(pixclk) * N / (128 * Fs)
---	N		=> 5248)	-- N = 128 * Fs /1000,  128 * Fs /1500 <= N <= 128 * Fs /300 (Check HDMI spec 7.2 for details)
-
---	FREQ	=> 28000000,	-- pixel clock frequency = 25.2MHz
---	FS		=> 32000,	-- audio sample rate - should be 32000, 41000 or 48000 = 48KHz
---	CTS		=> 28000,	-- CTS = Freq(pixclk) * N / (128 * Fs)
---	N		=> 4096)	-- N = 128 * Fs /1000,  128 * Fs /1500 <= N <= 128 * Fs /300 (Check HDMI spec 7.2 for details)
-
-port map (
-	I_CLK_VGA	=> CLK_PIXEL_VGA,
-	I_CLK_TMDS	=> CLK_DVI,	-- 472.6 MHz max
-	I_HSYNC		=> VGA_HS_O,
-	I_VSYNC		=> VGA_VS_O,
-	I_BLANK		=> not VGA_BLANK,
-	I_RED		=> VGA_R_REG(0)&VGA_R_REG(1)&VGA_R_REG(2)&VGA_R_REG(3)&VGA_R_REG(4)&VGA_R_REG(5)&VGA_R_REG(6)&VGA_R_REG(7),
-	I_GREEN		=> VGA_G_REG(0)&VGA_G_REG(1)&VGA_G_REG(2)&VGA_G_REG(3)&VGA_G_REG(4)&VGA_G_REG(5)&VGA_G_REG(6)&VGA_G_REG(7),
-	I_BLUE		=> VGA_B_REG(0)&VGA_B_REG(1)&VGA_B_REG(2)&VGA_B_REG(3)&VGA_B_REG(4)&VGA_B_REG(5)&VGA_B_REG(6)&VGA_B_REG(7),
-	I_AUDIO_PCM_L 	=> audio_l,
-	I_AUDIO_PCM_R	=> audio_r,
-	TMDS_D0		=> HDMI_D0,
-	TMDS_D1		=> HDMI_D1,
-	TMDS_D2		=> HDMI_D2,
-	TMDS_CLK	=> HDMI_CLK);	-- D7=D2p, D6=D2n...D1=CLKp, D0=CLKn
+U5: entity work.hdmi_out_altera
+	port map (
+		clock_pixel_i	=> CLK_PIXEL_VGA,
+		clock_tdms_i	=> CLK_DVI,
+		red_i				=> O_RED,
+		green_i			=> O_GREEN,
+		blue_i			=> O_BLUE,
+		tmds_out_p		=> tmds_out_p,
+		tmds_out_n		=> tmds_out_n
+		);
 
 -------------------------------------------------------------------------------
 -- clocks
@@ -213,8 +216,8 @@ process (VGA_nVGA_IN, VGA_VS_O, VGA_HS_O, VGA_BLANK, TV_VS, TV_HS, VGA_R_REG, VG
 		CLK_PLL_IN, CLK_PIXEL_VGA, TV_VS_REG, TV_HS_REG, CLK_PIXEL_TV) 
 begin
 	if (VGA_nVGA_IN = '0') then 
-		VGA_VS <= VGA_VS_O;      -- êàäðîâûå ñèíõðîèìïóëüñû äëÿ VGA
-		VGA_HS <= VGA_HS_O;      -- ñòðî÷íûå ñèíõðîèìïóëüñû äëÿ VGA
+		VGA_VS <= VGA_VS_O;      -- ÐºÐ°Ð´Ñ€Ð¾Ð²Ñ‹Ðµ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð¸Ð¼Ð¿ÑƒÐ»ÑŒÑÑ‹ Ð´Ð»Ñ VGA
+		VGA_HS <= VGA_HS_O;      -- ÑÑ‚Ñ€Ð¾Ñ‡Ð½Ñ‹Ðµ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð¸Ð¼Ð¿ÑƒÐ»ÑŒÑÑ‹ Ð´Ð»Ñ VGA
 		VGA_R <= VGA_R_REG;
 		VGA_G <= VGA_G_REG;
 		VGA_B <= VGA_B_REG;
@@ -238,9 +241,9 @@ end process;
 -- audio
 ADC_CLK <= CLK_VGA;
 
-process (CLK_VGA, VGA_BLANK, audio_l, audio_r)
+process (CLK_PIXEL_VGA, adc_l, adc_r, audio_l, audio_r)
 begin
-	if CLK_VGA'event and CLK_VGA = '1' then
+	if CLK_PIXEL_VGA'event and CLK_PIXEL_VGA = '1' then
 		audio_l (15 downto 0) <= adc_l (23 downto 8);
 		audio_r (15 downto 0) <= adc_r (23 downto 8);
 	end if;
