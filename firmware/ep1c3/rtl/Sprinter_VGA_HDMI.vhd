@@ -64,12 +64,8 @@ port (
 	HDMI_CEC	: in std_logic := '0';
 	HDMI_ARC	: in std_logic := '0';
 	HDMI_DET	: in std_logic := '0';
---	HDMI_D0		: out std_logic;
---	HDMI_D1		: out std_logic;
---	HDMI_D2		: out std_logic;
---	HDMI_CLK		: std_logic;
 	tmds_out_p	: out std_logic_vector (3 downto 0);
-	tmds_out_n	: out std_logic_vector (3 downto 0);
+--	tmds_out_n	: out std_logic_vector (3 downto 0);
 
 	-- VGA 
 	VGA_nVGA_IN : in std_logic := '1';
@@ -107,6 +103,7 @@ signal adc_r		: std_logic_vector(23 downto 0) := x"000000";
 signal O_RED		: std_logic_vector(9 downto 0); -- Red
 signal O_GREEN		: std_logic_vector(9 downto 0); -- Green
 signal O_BLUE		: std_logic_vector(9 downto 0);  -- Blue
+signal RGB_REG		: std_logic_vector(29 downto 0); -- RGB reg for serializer
 
 begin
 
@@ -166,25 +163,41 @@ U4: entity work.hdmi
       I_576P_N		=> '0',
       -- PCM audio
       I_AUDIO_ENABLE	=> '1',
-      I_AUDIO_PCM_L	=> audio_l,
-      I_AUDIO_PCM_R	=> audio_r,
+      I_AUDIO_PCM_L		=> audio_l,
+      I_AUDIO_PCM_R		=> audio_r,
       -- TMDS parallel pixel synchronous outputs (serialize LSB first)
       O_RED				=> O_RED,
       O_GREEN			=> O_GREEN,
       O_BLUE			=> O_BLUE
-);
-
-U5: entity work.hdmi_out_altera
-	port map (
-		clock_pixel_i	=> CLK_PIXEL_VGA,
-		clock_tdms_i	=> CLK_DVI,
-		red_i				=> O_RED,
-		green_i			=> O_GREEN,
-		blue_i			=> O_BLUE,
-		tmds_out_p		=> tmds_out_p,
-		tmds_out_n		=> tmds_out_n
 		);
 
+-- ALTDDIO outputs
+--U5: entity work.hdmi_out_altera
+--	port map (
+--		clock_pixel_i	=> CLK_PIXEL_VGA,
+--		clock_tdms_i	=> CLK_DVI,
+--		red_i			=> O_RED,
+--		green_i			=> O_GREEN,
+--		blue_i			=> O_BLUE,
+--		tmds_out_p		=> tmds_out_p,
+--		tmds_out_n		=> tmds_out_n
+--		);
+
+-- LVDS outputs
+U5: entity work.serializer
+	PORT MAP (
+		tx_in	 		=> RGB_REG,
+		tx_inclock	 	=> CLK_DVI,
+		tx_syncclock	=> CLK_PIXEL_VGA,
+		tx_out	 		=> tmds_out_p (2 downto 0)
+		);
+
+RGB_REG <=	O_RED(0)&	O_RED(1)&	O_RED(2)&	O_RED(3)&	O_RED(4)&	O_RED(5)&	O_RED(6)&	O_RED(7)&	O_RED(8)&	O_RED(9)&
+			O_GREEN(0)&	O_GREEN(1)&	O_GREEN(2)&	O_GREEN(3)&	O_GREEN(4)&	O_GREEN(5)&	O_GREEN(6)&	O_GREEN(7)&	O_GREEN(8)&	O_GREEN(9)&
+			O_BLUE(0)&	O_BLUE(1)&	O_BLUE(2)&	O_BLUE(3)&	O_BLUE(4)&	O_BLUE(5)&	O_BLUE(6)&	O_BLUE(7)&	O_BLUE(8)&	O_BLUE(9);
+
+tmds_out_p(3) <= CLK_PIXEL_VGA;
+---
 -------------------------------------------------------------------------------
 -- clocks
 -- video
